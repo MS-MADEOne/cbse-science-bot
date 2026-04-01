@@ -3,144 +3,141 @@ import pypdf
 import google.generativeai as genai
 import re
 import os
+import requests
 
 # --- UI CONFIG ---
-st.set_page_config(page_title="CBSE Science Smart Library", page_icon="📚", layout="wide")
+st.set_page_config(page_title="CBSE Science Hub 2026-27", page_icon="🧪", layout="wide")
 
-# --- STYLING ---
+# --- ADVANCED CSS FOR "INFOGRAPHICS" ---
 st.markdown("""
     <style>
-    .main-title { font-size:38px; color: #1565C0; font-weight: bold; text-align: center; }
-    .video-link { display: inline-block; background-color: #FF0000; color: white !important; 
-                  padding: 10px 20px; border-radius: 8px; text-decoration: none; font-weight: bold; }
-    .lib-box { background-color: #f1f8ff; padding: 10px; border-radius: 8px; border-left: 5px solid #1565C0; }
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap');
+    html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
+    
+    .main-title { font-size:45px; color: #1E3A8A; font-weight: 800; text-align: center; margin-bottom: 30px; }
+    
+    /* Bento Grid Styling for Infographics */
+    .bento-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin-top: 20px; }
+    .bento-card { background: white; padding: 20px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); border-top: 5px solid #3B82F6; }
+    .card-title { font-size: 18px; font-weight: 700; color: #1E40AF; margin-bottom: 10px; display: flex; align-items: center; gap: 8px; }
+    .formula-pill { background: #EFF6FF; color: #1E40AF; padding: 5px 12px; border-radius: 20px; font-weight: 600; font-size: 14px; border: 1px solid #BFDBFE; display: inline-block; margin: 5px; }
+    
+    /* Chat Styling */
+    .stChatMessage { border-radius: 15px; margin-bottom: 10px; }
+    .video-btn { background-color: #EF4444; color: white !important; padding: 10px 20px; border-radius: 10px; text-decoration: none; font-weight: bold; display: inline-block; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- SMART MODEL SELECTION ---
+# --- HELPER FUNCTIONS ---
+def get_wikimedia_image(query):
+    try:
+        url = f"https://en.wikipedia.org/w/api.php?action=query&format=json&formatversion=2&prop=pageimages|pageterms&piprop=original&titles={query}"
+        res = requests.get(url).json()
+        return res['query']['pages'][0]['original']['source']
+    except: return None
+
 @st.cache_resource
 def initialize_bot():
     try:
-        if "GEMINI_KEY" not in st.secrets:
-            st.error("Missing GEMINI_KEY in Secrets!")
-            return None
         genai.configure(api_key=st.secrets["GEMINI_KEY"])
-        available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-        target_models = ["models/gemini-1.5-flash", "models/gemini-1.5-pro", "models/gemini-pro"]
-        final_model_name = next((m for m in target_models if m in available_models), available_models[0])
-        return genai.GenerativeModel(final_model_name)
-    except:
-        return None
+        models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+        name = "models/gemini-1.5-flash" if "models/gemini-1.5-flash" in models else models[0]
+        return genai.GenerativeModel(name)
+    except: return None
 
 model = initialize_bot()
 
-# --- PDF PROCESSING ---
 @st.cache_data
-def load_built_in_pdf(file_path):
-    try:
-        with open(file_path, "rb") as f:
-            pdf_reader = pypdf.PdfReader(f)
-            text = ""
-            for page in pdf_reader.pages:
-                page_text = page.extract_text()
-                if page_text: text += page_text + " "
-            return re.sub(r'[^\x00-\x7F]+', ' ', text).strip()
-    except Exception as e:
-        return f"Error loading file: {e}"
+def load_pdf(path):
+    pdf = pypdf.PdfReader(open(path, "rb"))
+    text = "".join([p.extract_text() for p in pdf.pages])
+    return re.sub(r'[^\x00-\x7F]+', ' ', text).strip()
 
 # --- APP INTERFACE ---
-st.markdown("<h1 class='main-title'>🎓 CBSE Class 10 Digital Science Library</h1>", unsafe_allow_html=True)
+st.markdown("<h1 class='main-title'>🚀 CBSE Class 10 Science Hub</h1>", unsafe_allow_html=True)
 
-# SIDEBAR: CHAPTER SELECTION
-st.sidebar.title("📖 Chapter Library")
-
-SYLLABUS_DIR = "ncert_syllabus" 
-
-# Create folder if it doesn't exist
-if not os.path.exists(SYLLABUS_DIR):
-    os.makedirs(SYLLABUS_DIR)
-
-# Get list of PDF files
-pdf_files = [f for f in os.listdir(SYLLABUS_DIR) if f.endswith(".pdf")]
-
-# --- THE LINE YOU NEED IS HERE ---
-pdf_files.sort() 
-# ---------------------------------
+SYLLABUS_DIR = "ncert_syllabus"
+if not os.path.exists(SYLLABUS_DIR): os.makedirs(SYLLABUS_DIR)
+pdf_files = sorted([f for f in os.listdir(SYLLABUS_DIR) if f.endswith(".pdf")])
 
 if pdf_files:
-    selected_file = st.sidebar.selectbox("📂 Select a Chapter to Study:", pdf_files)
-    file_path = os.path.join(SYLLABUS_DIR, selected_file)
-    
-    # Load text automatically
-    syllabus_text = load_built_in_pdf(file_path)
-    st.sidebar.success(f"Loaded: {selected_file}")
+    selected_file = st.sidebar.selectbox("📂 Select Chapter", pdf_files)
+    syllabus_text = load_pdf(os.path.join(SYLLABUS_DIR, selected_file))
 else:
-    st.sidebar.warning(f"No PDFs found in '{SYLLABUS_DIR}' folder.")
+    st.sidebar.warning("Upload PDFs to GitHub folder!")
     syllabus_text = ""
 
-# CHAT INTERFACE
-if "messages" not in st.session_state:
-    st.session_state.messages = []
+# --- TABS SYSTEM ---
+tab1, tab2, tab3 = st.tabs(["💬 AI Tutor", "📊 Visual Infographics", "📝 Exam Cheat Sheet"])
 
-# Display Chat History
-for message in st.session_state.messages:
-    with st.chat_message(message["role"]):
-        st.markdown(message["content"])
+# --- TAB 1: AI TUTOR ---
+with tab1:
+    if "messages" not in st.session_state: st.session_state.messages = []
+    for msg in st.session_state.messages:
+        with st.chat_message(msg["role"]): st.markdown(msg["content"])
 
-if prompt := st.chat_input("Ask a question about this chapter..."):
-    st.session_state.messages.append({"role": "user", "content": prompt})
-    with st.chat_message("user"):
-        st.markdown(prompt)
+    if prompt := st.chat_input("Ask a question..."):
+        st.session_state.messages.append({"role": "user", "content": prompt})
+        with st.chat_message("user"): st.markdown(prompt)
 
-    with st.chat_message("assistant"):
-        if model:
-            with st.spinner("Tutor is searching the textbook..."):
-                context = syllabus_text[:8000] if syllabus_text else ""
-                
-                ai_prompt = f"""
-                You are a professional CBSE Class 10 Science Teacher. 
-                Context from Chapter: {context}
-                Student Question: {prompt}
-                
-                Instructions:
-                1. Answer clearly in Class 10 Board level language.
-                2. If a process/reaction is involved, draw a flowchart using Graphviz DOT code.
-                3. End with VIDEO_KEYWORD: [Specific Topic Name]
-                
-                Format:
-                [Text Answer]
-                DIAGRAM_START
-                [Graphviz DOT Code]
-                DIAGRAM_END
-                VIDEO_KEYWORD: [Topic]
-                """
-                
-                try:
-                    response = model.generate_content(ai_prompt)
-                    full_res = response.text
-                    
-                    # Rendering Logic for Diagram
-                    if "DIAGRAM_START" in full_res:
-                        parts = full_res.split("DIAGRAM_START")
-                        st.markdown(parts[0])
-                        code_rest = parts[1].split("DIAGRAM_END")
-                        st.graphviz_chart(code_rest[0].strip())
-                        final_text = code_rest[1] if len(code_rest) > 1 else ""
-                    else:
-                        st.markdown(full_res)
-                        final_text = full_res
+        with st.chat_message("assistant"):
+            context = syllabus_text[:8000]
+            ai_prompt = f"Teacher, answer using this context: {context}. Question: {prompt}. If a process exists, use Graphviz. End with VIDEO_KEYWORD: [topic]"
+            res = model.generate_content(ai_prompt).text
+            
+            # Simple UI cleanup for chat
+            if "DIAGRAM_START" in res:
+                st.markdown(res.split("DIAGRAM_START")[0])
+                st.graphviz_chart(res.split("DIAGRAM_START")[1].split("DIAGRAM_END")[0])
+                st.markdown(res.split("DIAGRAM_END")[1])
+            else: st.markdown(res)
+            st.session_state.messages.append({"role": "assistant", "content": res})
 
-                    # Video Link Logic
-                    if "VIDEO_KEYWORD:" in final_text:
-                        keyword = final_text.split("VIDEO_KEYWORD:")[1].strip().split('\n')[0]
-                        yt_url = f"https://www.youtube.com/results?search_query=CBSE+Class+10+Science+NCERT+{keyword.replace(' ', '+')}"
-                        st.markdown(f"### 📺 Video Lesson\n<a href='{yt_url}' target='_blank' class='video-link'>▶️ Watch {keyword} Lesson</a>", unsafe_allow_html=True)
+# --- TAB 2: VISUAL INFOGRAPHICS ---
+with tab2:
+    if syllabus_text:
+        st.subheader("💡 Visual Breakdown")
+        with st.spinner("Generating Visual Map..."):
+            # Request specific JSON-like data for Infographics
+            info_prompt = f"Summarize {selected_file} into 3 categories: 1. Main Concept, 2. Key Process, 3. Image Search Word. Context: {syllabus_text[:4000]}"
+            info_res = model.generate_content(info_prompt).text
+            
+            # Render Bento Grid
+            col1, col2 = st.columns([2, 1])
+            with col1:
+                st.markdown(f"""
+                <div class="bento-container">
+                    <div class="bento-card">
+                        <div class="card-title">📖 Chapter Overview</div>
+                        <p>{info_res[:500]}...</p>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+            
+            with col2:
+                # Dynamic Image Logic
+                img_word = selected_file.replace(".pdf", "").replace("_", " ")
+                img_url = get_wikimedia_image(img_word)
+                if img_url:
+                    st.markdown("<div class='bento-card'><b>🖼️ Reference Diagram</b></div>", unsafe_allow_html=True)
+                    st.image(img_url, use_container_width=True)
 
-                    st.session_state.messages.append({"role": "assistant", "content": full_res})
-                except Exception as e:
-                    st.error("Connection Error. Please ask again.")
-        else:
-            st.error("AI Key Error. Check Streamlit Secrets.")
+# --- TAB 3: EXAM CHEAT SHEET ---
+with tab3:
+    if syllabus_text:
+        st.subheader(f"⚡ {selected_file} Cheat Sheet")
+        cheat_prompt = f"Extract all formulas and 5 important board exam points from: {syllabus_text[:6000]}"
+        cheat_res = model.generate_content(cheat_prompt).text
+        
+        # Display as a clean list of formulas
+        formulas = re.findall(r'(\w+\s*=\s*[\w\d\s/+\-*]+)', cheat_res)
+        if formulas:
+            st.markdown("### 🔢 Formula Bank")
+            for f in formulas:
+                st.markdown(f"<span class='formula-pill'>{f}</span>", unsafe_allow_html=True)
+        
+        st.markdown("### 📝 Must-Know for Boards")
+        st.info(cheat_res)
 
 st.sidebar.markdown("---")
-st.sidebar.caption("Syllabus: CBSE 2026-27")
+st.sidebar.caption("Designed for CBSE 2026-27")

@@ -14,12 +14,21 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 # --- FUNCTION TO READ PDF ---
+import pypdf  # Change this from PyPDF2 to pypdf
+
+# --- FUNCTION TO READ PDF (UPDATED) ---
 def read_pdf(file):
-    pdf_reader = PyPDF2.PdfReader(file)
-    text = ""
-    for page in pdf_reader.pages:
-        text += page.extract_text()
-    return text
+    try:
+        pdf_reader = pypdf.PdfReader(file)
+        text = ""
+        for page in pdf_reader.pages:
+            content = page.extract_text()
+            if content:
+                text += content
+        return text
+    except Exception as e:
+        st.error(f"Error reading PDF: {e}")
+        return ""
 
 # --- MAIN APP ---
 st.markdown('<p class="main-title">🧪 CBSE Class 10 Science: Full Syllabus Bot</p>', unsafe_allow_html=True)

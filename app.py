@@ -1,50 +1,48 @@
 import streamlit as st
 import pypdf
 import google.generativeai as genai
-
-# --- GOOGLE AI SETUP ---
-# This line tells the app: "Go look in the hidden 'Secrets' settings for GEMINI_KEY"
-try:
-    API_KEY = st.secrets["GEMINI_KEY"]
-    genai.configure(api_key=API_KEY)
-    model = genai.GenerativeModel('gemini-pro')
-except KeyError:
-    st.error("API Key not found! Please add 'GEMINI_KEY' to Streamlit Secrets.")
+import re
 
 # --- UI CONFIG ---
 st.set_page_config(page_title="CBSE Science AI Tutor", page_icon="🧬", layout="wide")
 
-# --- STYLING ---
-st.markdown("""
-    <style>
-    .main-title { font-size:40px; color: #1E88E5; font-weight: bold; text-align: center; }
-    .stChatFloatingInputContainer { bottom: 20px; }
-    </style>
-    """, unsafe_allow_html=True)
-
 # --- GOOGLE AI SETUP ---
-# For security, you can put your key here, OR use Streamlit Secrets
-API_KEY = "PASTE_YOUR_GEMINI_API_KEY_HERE" 
-genai.configure(api_key=API_KEY)
-model = genai.GenerativeModel('gemini-pro')
+try:
+    # Fetch API Key from Streamlit Secrets
+    API_KEY = st.secrets["GEMINI_KEY"]
+    genai.configure(api_key=API_KEY)
+    # Using 'gemini-1.5-flash' - it is faster and better at handling text context
+    model = genai.GenerativeModel('gemini-1.5-flash')
+except Exception as e:
+    st.error("Missing GEMINI_KEY in Secrets or API Error. Check your Streamlit Dashboard.")
+
+def clean_text(text):
+    """Removes special characters that break the AI request"""
+    # Remove non-printable characters and keep basic punctuation
+    text = re.sub(r'[^\x20-\x7E]+', ' ', text)
+    return text
 
 def read_pdf(file):
     pdf_reader = pypdf.PdfReader(file)
     text = ""
     for page in pdf_reader.pages:
-        text += page.extract_text()
-    return text
+        page_text = page.extract_text()
+        if page_text:
+            text += page_text + " "
+    return clean_text(text)
 
 # --- APP INTERFACE ---
-st.markdown('<p class="main-title">🤖 CBSE Class 10 Smart AI Tutor</p>', unsafe_allow_html=True)
+st.markdown("<h1 style='text-align: center; color: #1E88E5;'>🤖 CBSE Science AI Tutor</h1>", unsafe_allow_html=True)
 
 st.sidebar.title("📚 Study Material")
 uploaded_file = st.sidebar.file_uploader("Upload NCERT Science PDF", type="pdf")
 
 if uploaded_file:
-    with st.spinner("Analyzing the syllabus..."):
-        syllabus_text = read_pdf(uploaded_file)
-        st.sidebar.success("Syllabus Loaded!")
+    # Using session_state to save text so we don't re-read the PDF every time
+    if "syllabus_text" not in st.session_state:
+        with st.spinner("Analyzing the syllabus..."):
+            st.session_state.syllabus_text = read_pdf(uploaded_file)
+            st.sidebar.success("Syllabus Loaded!")
 
     # Chat Interface
     if "messages" not in st.session_state:
@@ -56,35 +54,36 @@ if uploaded_file:
             st.markdown(message["content"])
 
     # User Input
-    if prompt := st.chat_input("Ask me anything (e.g. Explain Ohm's Law with an example)"):
+    if prompt := st.chat_input("Ask a question from the syllabus..."):
         st.session_state.messages.append({"role": "user", "content": prompt})
         with st.chat_message("user"):
             st.markdown(prompt)
 
         with st.chat_message("assistant"):
-            # The "Prompt Engineering" - Telling the AI how to behave
-            context_prompt = f"""
-            You are a Class 10 CBSE Science Teacher. 
-            Use the following text from the NCERT textbook to answer the student's question accurately.
-            If the answer is not in the text, use your general science knowledge but stay within the CBSE Class 10 syllabus.
-            Provide: 
-            1. A simple explanation.
-            2. The formula (if any).
-            3. A common exam question on this topic.
-            
-            Textbook Context: {syllabus_text[:5000]} # Using first 5000 chars for speed
-            
-            Student Question: {prompt}
-            """
-            
-            response = model.generate_content(context_prompt)
-            st.markdown(response.text)
-            st.session_state.messages.append({"role": "assistant", "content": response.text})
+            with st.spinner("Thinking..."):
+                # We only send a part of the text (e.g., first 8000 chars) to prevent 'Token Limit' errors
+                context = st.session_state.syllabus_text[:8000] 
+                
+                final_prompt = f"""
+                You are a professional CBSE Class 10 Science Teacher. 
+                Use this textbook data: {context}
+                
+                Answer this question: {prompt}
+                
+                Rules:
+                1. If it is a law/definition, state it clearly.
+                2. Use bullet points for steps/processes.
+                3. Suggest one 'Important for Boards' question related to this.
+                """
+                
+                try:
+                    response = model.generate_content(final_prompt)
+                    st.markdown(response.text)
+                    st.session_state.messages.append({"role": "assistant", "content": response.text})
+                except Exception as e:
+                    st.error("The AI had trouble processing this. Try asking a shorter question.")
+                    st.write(f"Error Details: {e}")
 
 else:
-    st.info("👋 Welcome! Please upload your Science NCERT PDF in the sidebar to start learning with the AI Tutor.")
-    st.image("https://ncert.nic.in/textbook/pdf/jesc110.pdf", caption="Try uploading a chapter from NCERT", width=300)
-
-# SIDEBAR INFO
-st.sidebar.markdown("---")
-st.sidebar.info("💡 **Tip:** Ask the bot to generate MCQs or explain diagrams from the text!")
+    st.info("👋 Welcome! Upload your NCERT Science PDF (Chapters or Full Book) to start.")
+    st.image("https://ncert.nic.in/textbook/pdf/jesc101.pdf", caption="Example: Chapter 1 - Chemical Reactions", width=250)

@@ -4,7 +4,7 @@ import google.generativeai as genai
 import re
 
 # --- UI CONFIG ---
-st.set_page_config(page_title="CBSE Class 10 AI Tutor", page_icon="🎓", layout="wide")
+st.set_page_config(page_title="CBSE Class 10th Science AI Tutor", page_icon="🎓", layout="wide")
 
 # --- STYLING ---
 st.markdown("""

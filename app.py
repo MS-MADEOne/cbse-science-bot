@@ -7,7 +7,7 @@ import os
 import io
 
 # --- 1. UI CONFIG ---
-st.set_page_config(page_title="CBSE Science Global Hub", page_icon="🧪", layout="wide")
+st.set_page_config(page_title="CBSE Science Hub Pro", page_icon="🧪", layout="wide")
 
 # --- 2. STYLING ---
 st.markdown("""
@@ -17,87 +17,82 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- 3. UNIVERSAL AI INITIALIZATION ---
-@st.cache_resource
+# --- 3. UNIVERSAL AI INITIALIZATION (FIXED) ---
 def get_ai_model():
     try:
         if "GEMINI_KEY" not in st.secrets:
             return None
         genai.configure(api_key=st.secrets["GEMINI_KEY"])
-        # Probe for working model
-        for name in ["gemini-1.5-flash", "models/gemini-1.5-flash", "gemini-pro"]:
-            try:
-                m = genai.GenerativeModel(name)
-                m.generate_content("Hi")
-                return m
-            except: continue
+        # Standardize model selection
+        model_name = "models/gemini-1.5-flash"
+        try:
+            m = genai.GenerativeModel(model_name)
+            # Simple test to verify the key is active
+            m.generate_content("test")
+            return m
+        except:
+            return genai.GenerativeModel("gemini-pro")
+    except:
         return None
-    except: return None
 
 if "ai_brain" not in st.session_state:
     st.session_state.ai_brain = get_ai_model()
 
-# --- 4. IMPROVED SEARCH ENGINE ---
-def find_topic_in_pdf(pdf_path, query):
-    try:
-        doc = fitz.open(pdf_path)
-        
-        # STOP-WORD FILTER: Ignore common filler words
-        stop_words = {"can", "you", "show", "me", "the", "of", "a", "an", "is", "diagram", "draw", "explain", "please", "find"}
-        keywords = [word for word in query.lower().split() if word not in stop_words and len(word) > 2]
-        
-        if not keywords: # Fallback if user only typed stop words
-            keywords = query.lower().split()
+# --- 4. GLOBAL SCORING SEARCH ENGINE ---
+def search_all_books(directory, query):
+    stop_words = {"draw", "make", "explain", "show", "me", "the", "of", "and", "diagram", "please"}
+    keywords = [w for w in query.lower().split() if w not in stop_words and len(w) > 2]
+    
+    if not keywords: keywords = query.lower().split()
 
-        best_page = None
-        max_hits = 0
+    best_overall_match = {
+        "score": 0,
+        "text": "",
+        "img": None,
+        "page": 0,
+        "file": ""
+    }
+
+    files = [f for f in os.listdir(directory) if f.endswith(".pdf")]
+    
+    for filename in files:
+        path = os.path.join(directory, filename)
+        doc = fitz.open(path)
         
         for page_num, page in enumerate(doc):
             text = page.get_text().lower()
-            # Count how many unique keywords appear on this page
-            hits = sum(1 for kw in keywords if kw in text)
-            if hits > max_hits:
-                max_hits = hits
-                best_page = page_num
+            # Score based on keyword density
+            score = sum(text.count(kw) for kw in keywords)
+            
+            if score > best_overall_match["score"]:
+                best_overall_match["score"] = score
+                best_overall_match["file"] = filename
+                best_overall_match["page"] = page_num + 1
+                
+                # Extract context (3 pages)
+                start = max(0, page_num - 1)
+                end = min(len(doc), page_num + 2)
+                context_text = ""
+                for i in range(start, end):
+                    context_text += doc[i].get_text() + "\n"
+                best_overall_match["text"] = context_text
+                
+                # Take High-Res Screenshot
+                pix = page.get_pixmap(matrix=fitz.Matrix(2, 2))
+                best_overall_match["img"] = Image.open(io.BytesIO(pix.tobytes()))
 
-        # We only return a result if we found at least one strong keyword match
-        if best_page is not None and max_hits > 0:
-            start = max(0, best_page - 1)
-            end = min(len(doc), best_page + 2)
-            context_text = ""
-            for i in range(start, end):
-                context_text += doc[i].get_text() + "\n"
-            
-            page = doc.load_page(best_page)
-            pix = page.get_pixmap(matrix=fitz.Matrix(1.5, 1.5))
-            img = Image.open(io.BytesIO(pix.tobytes()))
-            
-            return context_text, img, best_page + 1
-        return None, None, None
-    except:
-        return None, None, None
+    return best_overall_match
 
 # --- 5. MAIN INTERFACE ---
 st.markdown("<h1 class='main-title'>🎓 CBSE Class 10 Global Science Hub</h1>", unsafe_allow_html=True)
 
 SYLLABUS_DIR = "ncert_syllabus"
-if not os.path.exists(SYLLABUS_DIR):
-    os.makedirs(SYLLABUS_DIR)
+if not os.path.exists(SYLLABUS_DIR): os.makedirs(SYLLABUS_DIR)
 
-# Sidebar Info
+# Sidebar
 pdf_files = sorted([f for f in os.listdir(SYLLABUS_DIR) if f.endswith(".pdf")])
-st.sidebar.title("📚 Library Status")
-if pdf_files:
-    st.sidebar.success(f"Books Loaded: {len(pdf_files)}")
-    with st.sidebar.expander("See Available Chapters"):
-        for f in pdf_files: st.write(f"• {f}")
-else:
-    st.sidebar.error("No PDFs found in 'ncert_syllabus' on GitHub.")
-
-mode = st.sidebar.radio("Search Mode:", ["Global (All Books)", "Single Chapter"])
-selected_chap = None
-if mode == "Single Chapter" and pdf_files:
-    selected_chap = st.sidebar.selectbox("📂 Choose Chapter", pdf_files)
+st.sidebar.title("📚 Library Hub")
+st.sidebar.success(f"Chapters Loaded: {len(pdf_files)}")
 
 # Chat History
 if "history" not in st.session_state: st.session_state.history = []
@@ -106,44 +101,64 @@ for m in st.session_state.history:
     with st.chat_message(m["role"]):
         st.markdown(m["content"])
         if "image" in m and m["image"]: st.image(m["image"])
+        if "graph" in m and m["graph"]: st.graphviz_chart(m["graph"])
 
-# --- SEARCH LOGIC ---
-if prompt := st.chat_input("Search (e.g. Human Eye, Ohm's Law, Respiration)"):
+# --- CHAT LOGIC ---
+if prompt := st.chat_input("Ask: 'Draw Human Eye' or 'Explain Oxidation'..."):
     st.session_state.history.append({"role": "user", "content": prompt})
     with st.chat_message("user"): st.markdown(prompt)
 
     with st.chat_message("assistant"):
-        found_txt, found_img, p_no, source_file = "", None, 0, ""
-        
-        with st.spinner("🔍 Scanning NCERT Library..."):
-            targets = [selected_chap] if mode == "Single Chapter" and selected_chap else pdf_files
-            
-            for file in targets:
-                path = os.path.join(SYLLABUS_DIR, file)
-                txt, img, page = find_topic_in_pdf(path, prompt)
-                if txt:
-                    found_txt, found_img, p_no, source_file = txt, img, page, file
-                    break 
+        with st.spinner("🔍 Scanning entire Library for the best match..."):
+            match = search_all_books(SYLLABUS_DIR, prompt)
 
-        if found_txt:
+        if match["score"] > 0:
             if st.session_state.ai_brain:
                 try:
-                    # Send only relevant context to AI
-                    ai_prompt = f"Using NCERT text: {found_txt[:4000]}. Answer: {prompt}."
+                    # Specialized prompt for 'Draw' requests
+                    ai_prompt = f"""
+                    You are a CBSE Science Teacher. Use this NCERT data: {match['text'][:5000]}
+                    Student Question: {prompt}
+                    Instruction: 
+                    1. Explain in simple Class 10 terms.
+                    2. If asked to 'draw', create a logic flowchart using DOT code.
+                    Format: [Answer] DIAGRAM_START [DOT code] DIAGRAM_END
+                    """
                     response = st.session_state.ai_brain.generate_content(ai_prompt)
-                    ans = f"{response.text}\n\n**📍 Source: {source_file} (Page {p_no})**"
+                    ans_text = response.text
                     
-                    st.markdown(ans)
-                    if found_img: st.image(found_img, caption=f"NCERT Diagram: {prompt}")
-                    st.session_state.history.append({"role": "assistant", "content": ans, "image": found_img})
+                    # Handle AI Drawing (Graphviz)
+                    graph_code = ""
+                    if "DIAGRAM_START" in ans_text:
+                        parts = ans_text.split("DIAGRAM_START")
+                        ans_text = parts[0]
+                        graph_code = parts[1].split("DIAGRAM_END")[0].strip()
+
+                    final_res = f"{ans_text}\n\n**📍 Source: {match['file']} (Page {match['page']})**"
+                    st.markdown(final_res)
+                    
+                    if graph_code:
+                        st.subheader("📊 Logic Flowchart (Bot Drawing)")
+                        st.graphviz_chart(graph_code)
+                    
+                    if match["img"]:
+                        st.subheader("🖼️ Textbook Reference Page")
+                        st.image(match["img"])
+                    
+                    st.session_state.history.append({
+                        "role": "assistant", 
+                        "content": final_res, 
+                        "image": match["img"], 
+                        "graph": graph_code
+                    })
                 except Exception as e:
-                    st.error(f"Topic found in {source_file}, but AI is busy. Here is the page image:")
-                    if found_img: st.image(found_img)
+                    st.error("AI is temporarily unavailable. Here is the textbook page:")
+                    st.image(match["img"])
             else:
-                st.warning(f"Topic found in {source_file} (Page {p_no}), but AI is not configured. Check your API Key.")
-                if found_img: st.image(found_img)
+                st.warning(f"Found in {match['file']} (Page {match['page']}), but AI key is missing.")
+                st.image(match["img"])
         else:
-            st.error("❌ Topic not found. Try simpler keywords like 'Eye', 'Heart', or 'Acid'.")
+            st.error("❌ Topic not found. Please ensure all Science PDFs are in the 'ncert_syllabus' folder.")
 
 st.sidebar.markdown("---")
-st.sidebar.caption("Syllabus: CBSE 2026-27")
+st.sidebar.caption("CBSE 2026-27 | Digital Tutor")

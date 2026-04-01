@@ -6,33 +6,44 @@ import re
 # --- UI CONFIG ---
 st.set_page_config(page_title="CBSE Science AI Tutor", page_icon="🧬", layout="wide")
 
-# --- GOOGLE AI SETUP ---
-def get_model():
+# --- GOOGLE AI AUTO-SETUP ---
+def initialize_bot():
     try:
         API_KEY = st.secrets["GEMINI_KEY"]
         genai.configure(api_key=API_KEY)
         
-        # We try 1.5-flash first as it's better for documents
-        try:
-            model = genai.GenerativeModel('gemini-1.5-flash')
-            # Test if model exists by sending a tiny probe
-            model.generate_content("test") 
-            return model
-        except Exception:
-            # Fallback to the most stable legacy model if 1.5-flash fails
-            return genai.GenerativeModel('gemini-pro')
+        # This part asks Google which models are available for your API key
+        available_models = [m.name for m in genai.list_models() 
+                           if 'generateContent' in m.supported_generation_methods]
+        
+        if not available_models:
+            st.error("Your API key doesn't have access to any models yet.")
+            return None
+
+        # Prefer 1.5-flash, then 1.5-pro, then gemini-pro
+        selected_model_name = ""
+        for name in ["models/gemini-1.5-flash", "models/gemini-1.5-pro", "models/gemini-pro"]:
+            if name in available_models:
+                selected_model_name = name
+                break
+        
+        if not selected_model_name:
+            selected_model_name = available_models[0] # Just pick the first one available
+            
+        return genai.GenerativeModel(selected_model_name)
             
     except Exception as e:
-        st.error("API Key Error. Check Streamlit Secrets.")
+        st.error(f"Setup Error: {e}")
         return None
 
-model = get_model()
+# Load the model once
+if "model" not in st.session_state:
+    st.session_state.model = initialize_bot()
 
 def clean_text(text):
-    """Clean PDF text to remove non-compatible characters"""
-    text = re.sub(r'[^\x00-\x7F]+', ' ', text) # Remove non-ASCII
-    text = text.replace('"', "'") # Escape quotes
-    return text
+    """Deep clean text to prevent API errors"""
+    text = re.sub(r'[^\x00-\x7F]+', ' ', text)
+    return text.strip()
 
 def read_pdf(file):
     pdf_reader = pypdf.PdfReader(file)
@@ -62,35 +73,33 @@ if uploaded_file:
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
 
-    if prompt := st.chat_input("Ask a question (e.g. Explain photosynthesis)"):
+    if prompt := st.chat_input("Ask a question..."):
         st.session_state.messages.append({"role": "user", "content": prompt})
         with st.chat_message("user"):
             st.markdown(prompt)
 
         with st.chat_message("assistant"):
-            if model:
-                with st.spinner("Searching the textbook..."):
-                    # Use a safer, smaller context window
-                    context = st.session_state.syllabus_text[:5000]
+            if st.session_state.model:
+                with st.spinner("Tutor is thinking..."):
+                    context = st.session_state.syllabus_text[:7000] # Safe context length
                     
                     final_prompt = f"""
-                    Context from NCERT: {context}
+                    You are a CBSE Science teacher. Use this NCERT data: {context}
                     
-                    Question: {prompt}
+                    Student Question: {prompt}
                     
-                    Instruction: You are a CBSE Science teacher. Answer clearly using the context provided. 
-                    If not in context, answer from CBSE Class 10 knowledge.
+                    Rules: Give a clear answer, a formula if applicable, and one board-exam tip.
                     """
                     
                     try:
-                        response = model.generate_content(final_prompt)
+                        response = st.session_state.model.generate_content(final_prompt)
                         st.markdown(response.text)
                         st.session_state.messages.append({"role": "assistant", "content": response.text})
                     except Exception as e:
-                        st.error("Model Error. Try a simpler question.")
-                        st.caption(f"Error: {e}")
+                        st.error("I'm having trouble with that request. Try a different topic.")
+                        st.caption(f"Details: {e}")
             else:
-                st.error("AI Model not initialized.")
+                st.error("AI not available. Please check your API key.")
 
 else:
-    st.info("👋 Welcome! Please upload a Science NCERT PDF (Chapter or Full Book) to begin.")
+    st.info("👋 Upload a Science NCERT PDF to start your session.")

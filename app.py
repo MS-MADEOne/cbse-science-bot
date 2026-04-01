@@ -2,6 +2,15 @@ import streamlit as st
 import pypdf
 import google.generativeai as genai
 
+# --- GOOGLE AI SETUP ---
+# This line tells the app: "Go look in the hidden 'Secrets' settings for GEMINI_KEY"
+try:
+    API_KEY = st.secrets["GEMINI_KEY"]
+    genai.configure(api_key=API_KEY)
+    model = genai.GenerativeModel('gemini-pro')
+except KeyError:
+    st.error("API Key not found! Please add 'GEMINI_KEY' to Streamlit Secrets.")
+
 # --- UI CONFIG ---
 st.set_page_config(page_title="CBSE Science AI Tutor", page_icon="🧬", layout="wide")
 

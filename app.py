@@ -54,15 +54,18 @@ st.markdown("<h1 class='main-title'>🎓 CBSE Class 10 Digital Science Library</
 # SIDEBAR: CHAPTER SELECTION
 st.sidebar.title("📖 Chapter Library")
 
-# THIS IS THE LINE YOU WERE LOOKING FOR:
 SYLLABUS_DIR = "ncert_syllabus" 
 
-# Create the folder if it doesn't exist yet
+# Create folder if it doesn't exist
 if not os.path.exists(SYLLABUS_DIR):
     os.makedirs(SYLLABUS_DIR)
 
 # Get list of PDF files
 pdf_files = [f for f in os.listdir(SYLLABUS_DIR) if f.endswith(".pdf")]
+
+# --- THE LINE YOU NEED IS HERE ---
+pdf_files.sort() 
+# ---------------------------------
 
 if pdf_files:
     selected_file = st.sidebar.selectbox("📂 Select a Chapter to Study:", pdf_files)
@@ -79,6 +82,7 @@ else:
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
+# Display Chat History
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
@@ -94,18 +98,28 @@ if prompt := st.chat_input("Ask a question about this chapter..."):
                 context = syllabus_text[:8000] if syllabus_text else ""
                 
                 ai_prompt = f"""
-                You are a CBSE Class 10 Science Teacher. 
-                Context: {context}
-                Question: {prompt}
-                Instructions: Answer in Class 10 language. 
-                If a process/reaction is involved, draw a flowchart using Graphviz DOT code.
-                Format: [Answer] DIAGRAM_START [DOT Code] DIAGRAM_END VIDEO_KEYWORD: [Topic]
+                You are a professional CBSE Class 10 Science Teacher. 
+                Context from Chapter: {context}
+                Student Question: {prompt}
+                
+                Instructions:
+                1. Answer clearly in Class 10 Board level language.
+                2. If a process/reaction is involved, draw a flowchart using Graphviz DOT code.
+                3. End with VIDEO_KEYWORD: [Specific Topic Name]
+                
+                Format:
+                [Text Answer]
+                DIAGRAM_START
+                [Graphviz DOT Code]
+                DIAGRAM_END
+                VIDEO_KEYWORD: [Topic]
                 """
                 
                 try:
                     response = model.generate_content(ai_prompt)
                     full_res = response.text
                     
+                    # Rendering Logic for Diagram
                     if "DIAGRAM_START" in full_res:
                         parts = full_res.split("DIAGRAM_START")
                         st.markdown(parts[0])
@@ -116,6 +130,7 @@ if prompt := st.chat_input("Ask a question about this chapter..."):
                         st.markdown(full_res)
                         final_text = full_res
 
+                    # Video Link Logic
                     if "VIDEO_KEYWORD:" in final_text:
                         keyword = final_text.split("VIDEO_KEYWORD:")[1].strip().split('\n')[0]
                         yt_url = f"https://www.youtube.com/results?search_query=CBSE+Class+10+Science+NCERT+{keyword.replace(' ', '+')}"
@@ -123,7 +138,7 @@ if prompt := st.chat_input("Ask a question about this chapter..."):
 
                     st.session_state.messages.append({"role": "assistant", "content": full_res})
                 except Exception as e:
-                    st.error("Connection Error. Please try again.")
+                    st.error("Connection Error. Please ask again.")
         else:
             st.error("AI Key Error. Check Streamlit Secrets.")
 

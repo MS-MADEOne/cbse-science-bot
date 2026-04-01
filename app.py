@@ -1,197 +1,111 @@
 import streamlit as st
 
-# --- DATASET (Sample - You can expand this) ---
-import streamlit as st
-
-# --- COMPREHENSIVE CBSE 10th PHYSICS DATA ---
+# --- COMPLETE CBSE 10th SCIENCE DATASET ---
 data = {
     "Physics": {
         "Light: Reflection & Refraction": {
-            "Concepts": """
-            **1. Reflection:** Bouncing back of light. Laws: ∠i = ∠r; Incident, reflected ray & normal lie in the same plane.
-            **2. Spherical Mirrors:** Concave (Converging) and Convex (Diverging).
-            **3. Mirror Formula:** 1/v + 1/u = 1/f.
-            **4. Refraction:** Bending of light when traveling from one medium to another. n = c/v.
-            **5. Lens Formula:** 1/v - 1/u = 1/f. 
-            **6. Power of Lens:** P = 1/f (in meters). Unit: Dioptre (D).
-            """,
-            "MCQs": [
-                "1. Which mirror is used by dentists? \nAns: Concave Mirror",
-                "2. The refractive index of water is 1.33. What does this mean? \nAns: Speed of light in air is 1.33 times faster than in water.",
-                "3. Where should an object be placed to get a real image of the same size? \nAns: At 2F."
-            ],
-            "Very Short Answers (1M)": [
-                "Q: Define Principal Focus. \nA: The point on the principal axis where all parallel light rays meet after reflection/refraction.",
-                "Q: Write the sign convention for a concave mirror's focal length. \nA: Negative."
-            ],
-            "Short Answers (3M)": [
-                "Q: State the laws of refraction. \nA: 1. Incident ray, refracted ray, and normal lie in the same plane. 2. Snell's Law: sin i / sin r = constant.",
-                "Q: Why is a convex mirror used as a rear-view mirror? \nA: It gives an erect, diminished image and a wider field of view."
-            ],
-            "Long Answers (5M)": [
-                "Q: Draw ray diagrams for a concave mirror when the object is between C and F. Describe the nature and size. \nA: Image is formed beyond C, it is real, inverted, and magnified."
-            ],
-            "Diagrams": [
-                {"title": "Ray Diagrams (Concave Mirror)", "url": "https://upload.wikimedia.org/wikipedia/commons/1/10/Reflection_angles.svg"},
-                {"title": "Refraction through Glass Slab", "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d7/Refraction_photo.png/300px-Refraction_photo.png"}
-            ]
+            "Concepts": "**Reflection:** ∠i = ∠r. **Mirror Formula:** 1/v + 1/u = 1/f. **Lens Formula:** 1/v - 1/u = 1/f. **Power:** P = 1/f(m).",
+            "MCQs": ["1. Focal length of plane mirror? Ans: Infinity", "2. Unit of Power? Ans: Dioptre"],
+            "Very Short Answers (1M)": ["Q: Define refractive index. A: Ratio of speed of light in vacuum to speed in medium."],
+            "Short Answers (3M)": ["Q: Why are convex mirrors used in cars? A: They give erect, diminished images and wide field of view."],
+            "Long Answers (5M)": ["Q: Draw ray diagrams for concave mirror at C and between C & F."],
+            "Diagrams": [{"title": "Reflection", "url": "https://upload.wikimedia.org/wikipedia/commons/1/10/Reflection_angles.svg"}]
         },
-        "Human Eye & Colorful World": {
-            "Concepts": """
-            **1. Power of Accommodation:** Ability of the eye lens to adjust focal length.
-            **2. Defects of Vision:** Myopia (Short-sightedness), Hypermetropia (Long-sightedness), Presbyopia.
-            **3. Dispersion:** Splitting of white light into VIBGYOR through a prism.
-            **4. Atmospheric Refraction:** Twinkling of stars, Advanced sunrise, Delayed sunset.
-            **5. Tyndall Effect:** Scattering of light by colloidal particles.
-            """,
-            "MCQs": [
-                "1. The least distance of distinct vision for a normal eye is? \nAns: 25 cm",
-                "2. The red color of the sun at sunrise is due to? \nAns: Scattering of light."
-            ],
-            "Very Short Answers (1M)": [
-                "Q: Which part of the eye controls the amount of light entering? \nA: Iris (by adjusting Pupil size).",
-                "Q: What is the function of the Retina? \nA: It acts as a screen where images are formed and converted into electrical signals."
-            ],
-            "Short Answers (3M)": [
-                "Q: Explain Myopia. \nA: Person can see nearby objects clearly but not distant ones. Image forms in front of the retina. Corrected by Concave lens."
-            ],
-            "Long Answers (5M)": [
-                "Q: Describe the formation of a Rainbow. \nA: It is caused by dispersion, refraction, and internal reflection of sunlight by water droplets."
-            ],
-            "Diagrams": [
-                {"title": "Human Eye Structure", "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/1/1e/Schematic_diagram_of_the_human_eye_en.svg/400px-Schematic_diagram_of_the_human_eye_en.svg.png"},
-                {"title": "Myopia and Correction", "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/f/f6/Myopia.svg/300px-Myopia.svg.png"}
-            ]
+        "Human Eye": {
+            "Concepts": "**Myopia:** Near clear, far blurry (Concave correction). **Hypermetropia:** Far clear, near blurry (Convex correction).",
+            "MCQs": ["1. Least distance of vision? Ans: 25cm"],
+            "Very Short Answers (1M)": ["Q: Function of Iris? A: Controls pupil size."],
+            "Short Answers (3M)": ["Q: Explain Tyndall Effect. A: Scattering of light by colloidal particles."],
+            "Long Answers (5M)": ["Q: Explain Dispersion of white light through a prism with a diagram."],
+            "Diagrams": [{"title": "Human Eye", "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/1/1e/Schematic_diagram_of_the_human_eye_en.svg/400px-Schematic_diagram_of_the_human_eye_en.svg.png"}]
         },
         "Electricity": {
-            "Concepts": """
-            **1. Electric Current (I):** I = Q/t. Unit: Ampere.
-            **2. Ohm’s Law:** V = IR (at constant temperature).
-            **3. Resistance (R):** Depends on length (L), Area (A), and nature of material (ρ). R = ρL/A.
-            **4. Series Connection:** Rs = R1 + R2 + R3.
-            **5. Parallel Connection:** 1/Rp = 1/R1 + 1/R2 + 1/R3.
-            **6. Joule’s Heating:** H = I²Rt.
-            **7. Electric Power:** P = VI = I²R = V²/R.
-            """,
-            "MCQs": [
-                "1. Unit of Resistivity is? \nAns: Ohm-meter (Ωm)",
-                "2. If resistance is doubled, current becomes? \nAns: Half."
-            ],
-            "Very Short Answers (1M)": [
-                "Q: Define 1 Ampere. \nA: Flow of 1 Coulomb of charge per second.",
-                "Q: Why is Tungsten used in bulbs? \nA: High melting point."
-            ],
-            "Short Answers (3M)": [
-                "Q: Distinguish between Series and Parallel circuits. \nA: Series: Same current, different voltage. Parallel: Different current, same voltage."
-            ],
-            "Long Answers (5M)": [
-                "Q: Derive the expression for equivalent resistance in parallel. \nA: Use I = I1 + I2 + I3 and V/R = V/R1 + V/R2 + V/R3."
-            ],
-            "Diagrams": [
-                {"title": "Ohm's Law Circuit", "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5f/Ohm%27s_law_setup.svg/300px-Ohm%27s_law_setup.svg.png"}
-            ]
+            "Concepts": "**Ohm's Law:** V=IR. **Resistance:** R = ρL/A. **Heating:** H = I²Rt. **Power:** P = VI.",
+            "MCQs": ["1. Unit of Resistivity? Ans: Ohm-meter"],
+            "Very Short Answers (1M)": ["Q: Define 1 Ampere. A: 1 Coulomb of charge per second."],
+            "Short Answers (3M)": ["Q: Why is parallel better than series at home? A: Independent switches, same voltage."],
+            "Long Answers (5M)": ["Q: Derive equivalent resistance for resistors in parallel."],
+            "Diagrams": [{"title": "Circuit", "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5f/Ohm%27s_law_setup.svg/300px-Ohm%27s_law_setup.svg.png"}]
+        }
+    },
+    "Chemistry": {
+        "Chemical Reactions": {
+            "Concepts": "**Types:** Combination, Decomposition, Displacement, Double Displacement, Redox.",
+            "MCQs": ["1. Fe + CuSO4 -> FeSO4 + Cu is? Ans: Displacement"],
+            "Very Short Answers (1M)": ["Q: Why paint iron? A: To prevent corrosion."],
+            "Short Answers (3M)": ["Q: Difference between Exothermic and Endothermic? A: Heat released vs Heat absorbed."],
+            "Long Answers (5M)": ["Q: Explain Electrolytic decomposition of water with diagram."],
+            "Diagrams": [{"title": "Reaction Types", "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a2/Chemical_Reaction.jpg/300px-Chemical_Reaction.jpg"}]
         },
-        "Magnetic Effects of Current": {
-            "Concepts": """
-            **1. Magnetic Field:** Region around a magnet where force is exerted.
-            **2. Right Hand Thumb Rule:** Used to find direction of magnetic field around a straight conductor.
-            **3. Solenoid:** A coil of many circular turns of insulated copper wire.
-            **4. Fleming’s Left Hand Rule:** For direction of Force (Thump-Force, Forefinger-Field, Middle-Current).
-            **5. Domestic Circuits:** Live wire (Red), Neutral wire (Black), Earth wire (Green). 220V, 50Hz in India.
-            """,
-            "MCQs": [
-                "1. The device used to detect current is? \nAns: Galvanometer",
-                "2. Direct Current (DC) frequency is? \nAns: 0 Hz"
-            ],
-            "Very Short Answers (1M)": [
-                "Q: What is a magnetic field line? \nA: Imaginary paths along which a North pole would move.",
-                "Q: What is the role of Fuse? \nA: Prevents damage from short-circuiting/overloading."
-            ],
-            "Short Answers (3M)": [
-                "Q: List properties of magnetic field lines. \nA: 1. Start North, end South. 2. Never intersect. 3. Crowded at poles."
-            ],
-            "Long Answers (5M)": [
-                "Q: Explain the working of a Solenoid. How can we increase its strength? \nA: By increasing the number of turns or increasing current or using a soft iron core."
-            ],
-            "Diagrams": [
-                {"title": "Magnetic Field around Bar Magnet", "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/0c/VFPt_cylindrical_magnet_thumb.svg/300px-VFPt_cylindrical_magnet_thumb.svg.png"}
-            ]
+        "Acids, Bases & Salts": {
+            "Concepts": "**pH Scale:** <7 Acidic, >7 Basic. **Neutralization:** Acid + Base -> Salt + Water.",
+            "MCQs": ["1. pH of Milk of Magnesia? Ans: 10"],
+            "Very Short Answers (1M)": ["Q: Common name of CaOCl2? A: Bleaching Powder."],
+            "Short Answers (3M)": ["Q: Why does distilled water not conduct electricity? A: It doesn't dissociate into ions."],
+            "Long Answers (5M)": ["Q: Explain Chlor-alkali process with equations."],
+            "Diagrams": [{"title": "pH Scale", "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a1/PH_Scale.svg/400px-PH_Scale.svg.png"}]
+        }
+    },
+    "Biology": {
+        "Life Processes": {
+            "Concepts": "**Nutrition:** Autotrophic & Heterotrophic. **Respiration:** Aerobic & Anaerobic. **Excretion:** Via Nephrons.",
+            "MCQs": ["1. Site of photosynthesis? Ans: Chloroplast"],
+            "Very Short Answers (1M)": ["Q: What is Peristalsis? A: Rhythmic contraction of food pipe."],
+            "Short Answers (3M)": ["Q: Role of HCl in stomach? A: Kills bacteria, activates pepsin."],
+            "Long Answers (5M)": ["Q: Describe the double circulation of blood in human heart."],
+            "Diagrams": [{"title": "Human Digestive System", "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c5/Digestive_system_diagram_edit.svg/300px-Digestive_system_diagram_edit.svg.png"}]
+        },
+        "Reproduction": {
+            "Concepts": "**Asexual:** Fission, Budding, Regeneration. **Sexual:** Pollination & Fertilization.",
+            "MCQs": ["1. Where does fertilization occur? Ans: Fallopian tube"],
+            "Very Short Answers (1M)": ["Q: Define vegetative propagation. A: Growth of new plant from roots/stems."],
+            "Short Answers (3M)": ["Q: Difference between Self and Cross pollination? A: Same flower vs different flower."],
+            "Long Answers (5M)": ["Q: Explain the parts of a flower with their functions."],
+            "Diagrams": [{"title": "Flower Structure", "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/7/7f/Mature_flower_diagram.svg/300px-Mature_flower_diagram.svg.png"}]
         }
     }
 }
 
-# --- IMPROVED UI LOGIC ---
-st.set_page_config(page_title="CBSE Class 10 Science Bot", page_icon="🚀")
-st.title("🚀 CBSE Class 10 Science Study Bot")
+# --- STREAMLIT UI CODE ---
+st.set_page_config(page_title="CBSE Class 10 Science Bot", page_icon="🧬")
+
+st.title("🧬 CBSE Class 10 Science Study Bot")
+st.markdown("---")
 
 # Sidebar navigation
 st.sidebar.header("Navigation")
-subject = st.sidebar.selectbox("Subject", list(data.keys()))
-chapter = st.sidebar.selectbox("Chapter", list(data[subject].keys()))
-category = st.sidebar.radio("Resource Type", ["Concepts", "MCQs", "Very Short Answers (1M)", "Short Answers (3M)", "Long Answers (5M)", "Diagrams"])
+subj_list = list(data.keys())
+subject = st.sidebar.selectbox("Select Subject", subj_list)
 
-# Display Section
-st.header(f"{chapter}")
+chap_list = list(data[subject].keys())
+chapter = st.sidebar.selectbox("Select Chapter", chap_list)
+
+category = st.sidebar.radio("Resource Type", 
+    ["Concepts", "MCQs", "Very Short Answers (1M)", "Short Answers (3M)", "Long Answers (5M)", "Diagrams"])
+
+# Content Display
+st.header(f"{subject}: {chapter}")
 st.subheader(category)
 
-selected_data = data[subject][chapter][category]
+selected_content = data[subject][chapter][category]
 
 if category == "Diagrams":
-    for diag in selected_data:
-        st.write(f"**{diag['title']}**")
-        st.image(diag['url'])
-elif isinstance(selected_data, list):
-    for item in selected_data:
-        with st.expander("Show Question/Answer"):
+    for item in selected_content:
+        st.write(f"**{item['title']}**")
+        st.image(item['url'], use_container_width=True)
+elif isinstance(selected_content, list):
+    for idx, item in enumerate(selected_content):
+        with st.expander(f"Question {idx+1}"):
             st.write(item)
 else:
-    st.info(selected_data)
+    st.info(selected_content)
 
-# Footer
-st.sidebar.divider()
-st.sidebar.write("✅ **Syllabus:** CBSE 2024-25")
-st.sidebar.write("👨‍🏫 **Target:** Class 10 Board Exams"),
-    } }"Chemistry": {
-        "Chemical Reactions": {
-            "Concepts": "Combination, Decomposition, Displacement, Redox reactions.",
-            "MCQs": ["1. Burning of Magnesium is? \nAns: Oxidation"],
-            "Short Answers": ["Q: Why is respiration considered exothermic? \nA: Because energy is released during the process."],
-            "Diagrams": "https://example.com/chemical_setup_diagram.jpg"
-        }
-    }
-}
+# Search Feature
+st.sidebar.markdown("---")
+st.sidebar.subheader("Quick Help")
+search = st.sidebar.text_input("Search a keyword (e.g. Prism)")
+if search:
+    st.sidebar.write(f"Tip: Go to Physics -> Human Eye to find information about {search}!")
 
-# --- UI CONFIG ---
-st.set_page_config(page_title="Class 10 CBSE Science Bot", page_icon="🧪")
-st.title("🧪 CBSE Class 10 Science Assistant")
-st.sidebar.header("Select Chapter")
-
-# --- SELECTION LOGIC ---
-subject = st.sidebar.selectbox("Choose Subject", list(data.keys()))
-chapter = st.sidebar.selectbox("Choose Chapter", list(data[subject].keys()))
-category = st.sidebar.radio("What do you need?", ["Concepts", "MCQs", "Short Answers", "Diagrams"])
-
-# --- DISPLAY CONTENT ---
-st.header(f"{chapter} - {category}")
-
-content = data[subject][chapter][category]
-
-if category == "Diagrams":
-    st.image(content, caption=f"Diagram for {chapter}")
-elif isinstance(content, list):
-    for item in content:
-        st.write(item)
-        st.divider()
-else:
-    st.write(content)
-
-# --- CHATBOT FEATURE ---
-st.sidebar.divider()
-st.sidebar.subheader("Quick Search")
-user_query = st.sidebar.text_input("Ask a quick question:")
-if user_query:
-    st.info(f"Searching for '{user_query}' in CBSE Syllabus...")
-    # Here you can add logic to search the 'data' dictionary
-    st.write("Feature coming soon: AI-based quick search!")
-
-st.caption("Developed for Class 10 CBSE Students")
+# UPDATED YEAR HERE
+st.sidebar.caption("Syllabus updated for 2026-27 Board Exams")

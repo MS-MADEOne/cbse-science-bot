@@ -4,28 +4,38 @@ import google.generativeai as genai
 import re
 
 # --- UI CONFIG ---
-st.set_page_config(page_title="CBSE Science AI Tutor", page_icon="🧪", layout="wide")
+st.set_page_config(page_title="CBSE Class 10 AI Tutor", page_icon="🎓", layout="wide")
 
 # --- STYLING ---
 st.markdown("""
     <style>
-    .main-title { font-size:40px; color: #1565C0; font-weight: bold; text-align: center; }
+    .main-title { font-size:38px; color: #1565C0; font-weight: bold; text-align: center; }
     .video-link { display: inline-block; background-color: #FF0000; color: white !important; 
                   padding: 10px 20px; border-radius: 8px; text-decoration: none; font-weight: bold; }
-    .bot-box { background-color: #f8f9fa; padding: 15px; border-radius: 10px; border: 1px solid #ddd; }
+    .stChatFloatingInputContainer { bottom: 20px; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- AI SETUP ---
+# --- SMART MODEL SELECTION ---
 def initialize_bot():
     try:
         if "GEMINI_KEY" not in st.secrets:
-            st.error("Please add GEMINI_KEY to Streamlit Secrets!")
+            st.error("Missing GEMINI_KEY in Secrets!")
             return None
+        
         genai.configure(api_key=st.secrets["GEMINI_KEY"])
-        return genai.GenerativeModel('gemini-1.5-flash')
+        
+        # This scans all models available to YOUR API key
+        available_models = [m.name for m in genai.list_models() 
+                           if 'generateContent' in m.supported_generation_methods]
+        
+        # Pick the best one available (Flash > Pro > Any)
+        target_models = ["models/gemini-1.5-flash", "models/gemini-1.5-pro", "models/gemini-pro"]
+        final_model_name = next((m for m in target_models if m in available_models), available_models[0])
+        
+        return genai.GenerativeModel(final_model_name)
     except Exception as e:
-        st.error(f"AI Setup Error: {e}")
+        st.error(f"Initialization Failed: {e}")
         return None
 
 if "model" not in st.session_state:
@@ -40,29 +50,27 @@ def read_pdf(file):
             if page_text: text += page_text + " "
         return re.sub(r'[^\x00-\x7F]+', ' ', text).strip()
     except:
-        return "Error reading PDF."
+        return ""
 
-# --- INTERFACE ---
-st.markdown("<h1 class='main-title'>🧪 CBSE Class 10 AI Tutor & Visualizer</h1>", unsafe_allow_html=True)
+# --- APP INTERFACE ---
+st.markdown("<h1 class='main-title'>🎓 CBSE Class 10 AI Tutor & Drawer</h1>", unsafe_allow_html=True)
 
 st.sidebar.title("📚 Study Material")
 uploaded_file = st.sidebar.file_uploader("Upload NCERT PDF Chapter", type="pdf")
 
 if uploaded_file:
     if "syllabus_text" not in st.session_state:
-        with st.spinner("Bot is reading the chapter..."):
+        with st.spinner("Bot is reading the PDF..."):
             st.session_state.syllabus_text = read_pdf(uploaded_file)
             st.sidebar.success("Chapter Loaded!")
 
     if "messages" not in st.session_state:
         st.session_state.messages = []
 
-    # Display Chat History
     for message in st.session_state.messages:
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
 
-    # User Input
     if prompt := st.chat_input("Explain and draw 'Double Circulation' or 'A Reaction'..."):
         st.session_state.messages.append({"role": "user", "content": prompt})
         with st.chat_message("user"):
@@ -70,55 +78,51 @@ if uploaded_file:
 
         with st.chat_message("assistant"):
             if st.session_state.model:
-                with st.spinner("Preparing your lesson..."):
-                    context = st.session_state.syllabus_text[:6000]
+                with st.spinner("Tutor is thinking..."):
+                    # Use a part of the textbook for context
+                    context = st.session_state.syllabus_text[:6000] if "syllabus_text" in st.session_state else ""
                     
                     ai_prompt = f"""
                     You are a CBSE Class 10 Science Teacher. 
                     Context: {context}
                     Question: {prompt}
                     
-                    Requirements:
-                    1. Explain in simple Class 10 level language.
-                    2. If a process/reaction is involved, create a simple logic flowchart using Graphviz DOT code.
+                    Instructions:
+                    1. Use simple Class 10 Board language.
+                    2. For any process or reaction, draw a flowchart using Graphviz DOT code.
                     
                     Format:
-                    [Explanation Text]
+                    [Your Answer]
                     
                     DIAGRAM_START
                     digraph G {{
                         node [shape=box, style=filled, fillcolor=lightblue];
-                        "Start" -> "Next Step";
+                        "Reactants" -> "Products";
                     }}
                     DIAGRAM_END
                     
-                    VIDEO_KEYWORD: [Single Topic Name]
+                    VIDEO_KEYWORD: [Topic Name]
                     """
                     
                     try:
                         response = st.session_state.model.generate_content(ai_prompt)
                         full_res = response.text
                         
-                        # PARSE TEXT, DIAGRAM, AND VIDEO
-                        clean_text = full_res
-                        
-                        # 1. Handle Diagram Drawing
+                        # PARSE LOGIC
                         if "DIAGRAM_START" in full_res:
                             parts = full_res.split("DIAGRAM_START")
-                            clean_text = parts[0]
-                            code_and_rest = parts[1].split("DIAGRAM_END")
-                            dot_code = code_and_rest[0].strip()
-                            rest = code_and_rest[1] if len(code_and_rest) > 1 else ""
+                            st.markdown(parts[0])
                             
-                            st.markdown(clean_text)
+                            code_rest = parts[1].split("DIAGRAM_END")
+                            dot_code = code_rest[0].strip()
                             st.subheader("📊 Concept Flowchart")
                             st.graphviz_chart(dot_code)
-                            final_part = rest
+                            
+                            final_part = code_rest[1] if len(code_rest) > 1 else ""
                         else:
                             st.markdown(full_res)
                             final_part = full_res
 
-                        # 2. Handle YouTube Video
                         if "VIDEO_KEYWORD:" in final_part:
                             keyword = final_part.split("VIDEO_KEYWORD:")[1].strip().split('\n')[0]
                             yt_url = f"https://www.youtube.com/results?search_query=CBSE+Class+10+Science+NCERT+{keyword.replace(' ', '+')}"
@@ -127,14 +131,10 @@ if uploaded_file:
 
                         st.session_state.messages.append({"role": "assistant", "content": full_res})
                     except Exception as e:
-                        st.error("AI is busy. Please try asking again in a moment!")
-                        st.caption(f"Error: {e}")
+                        st.error("I'm having trouble connecting to the AI. Let's try again.")
+                        st.caption(f"Technical Log: {e}")
             else:
-                st.error("AI not configured.")
+                st.error("AI is currently unavailable.")
 
 else:
     st.info("👋 To begin, upload a Science Chapter PDF from NCERT in the sidebar!")
-    st.image("https://ncert.nic.in/textbook/pdf/jesc101.pdf", caption="Example: Chemical Reactions Chapter", width=200)
-
-st.sidebar.markdown("---")
-st.sidebar.caption("🎯 Syllabus: CBSE 2026-27")

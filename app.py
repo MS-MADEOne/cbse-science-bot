@@ -17,135 +17,131 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- 3. AUTO-DISCOVERY AI ENGINE ---
-@st.cache_resource
-def init_ai():
+# --- 3. UNIVERSAL AI INITIALIZATION (FIXES 404) ---
+def get_ai_model():
     try:
-        if "GEMINI_KEY" not in st.secrets: return None
+        if "GEMINI_KEY" not in st.secrets:
+            st.error("Missing GEMINI_KEY in Secrets!")
+            return None
+        
         genai.configure(api_key=st.secrets["GEMINI_KEY"])
-        # Find best available model
-        models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-        name = "models/gemini-1.5-flash" if "models/gemini-1.5-flash" in models else "models/gemini-pro"
-        return genai.GenerativeModel(name)
+        
+        # We try to 'probe' for a working model name
+        # Some accounts use 'gemini-1.5-flash', some use 'models/gemini-1.5-flash'
+        test_names = ["gemini-1.5-flash", "models/gemini-1.5-flash", "gemini-pro", "models/gemini-pro"]
+        
+        for name in test_names:
+            try:
+                model = genai.GenerativeModel(name)
+                # Quick test call
+                model.generate_content("Hi")
+                return model
+            except:
+                continue
+        return None
     except Exception as e:
-        st.error(f"AI Setup Error: {e}")
+        st.error(f"Initialization Error: {e}")
         return None
 
-ai_model = init_ai()
+if "ai_brain" not in st.session_state:
+    st.session_state.ai_brain = get_ai_model()
 
-# --- 4. SMART PDF SEARCH & SCREENSHOT ---
+# --- 4. SMART PDF SEARCH ---
 def find_topic_in_pdf(pdf_path, query):
-    """Searches PDF and returns relevant text and page image"""
-    doc = fitz.open(pdf_path)
-    keywords = query.lower().split()
-    
-    best_page = None
-    extracted_text = ""
-    
-    # Search for the best page (where most keywords appear)
-    max_hits = 0
-    for page_num, page in enumerate(doc):
-        text = page.get_text()
-        hits = sum(1 for kw in keywords if kw in text.lower())
-        if hits > max_hits:
-            max_hits = hits
-            best_page = page_num
-            # Get text from current, previous and next page for context
-            start = max(0, page_num - 1)
-            end = min(len(doc), page_num + 2)
-            extracted_text = ""
+    try:
+        doc = fitz.open(pdf_path)
+        keywords = query.lower().split()
+        
+        best_page = None
+        max_hits = 0
+        
+        # Scanning for the best match
+        for page_num, page in enumerate(doc):
+            text = page.get_text().lower()
+            hits = sum(1 for kw in keywords if kw in text)
+            if hits > max_hits:
+                max_hits = hits
+                best_page = page_num
+
+        if best_page is not None:
+            # Extract text from 3 pages (previous, current, next)
+            start = max(0, best_page - 1)
+            end = min(len(doc), best_page + 2)
+            context_text = ""
             for i in range(start, end):
-                extracted_text += doc[i].get_text() + "\n"
+                context_text += doc[i].get_text() + "\n"
+            
+            # Create high-res screenshot
+            page = doc.load_page(best_page)
+            pix = page.get_pixmap(matrix=fitz.Matrix(1.5, 1.5))
+            img = Image.open(io.BytesIO(pix.tobytes()))
+            
+            return context_text, img, best_page + 1
+        return None, None, None
+    except:
+        return None, None, None
 
-    if best_page is not None:
-        # Generate Screenshot of the best page
-        page = doc.load_page(best_page)
-        pix = page.get_pixmap(matrix=fitz.Matrix(1.5, 1.5)) # Standard Res
-        img = Image.open(io.BytesIO(pix.tobytes()))
-        return extracted_text, img, best_page + 1
-    
-    return None, None, None
-
-# --- 5. MAIN APP INTERFACE ---
+# --- 5. MAIN INTERFACE ---
 st.markdown("<h1 class='main-title'>🎓 CBSE Class 10 Global Science Hub</h1>", unsafe_allow_html=True)
 
 SYLLABUS_DIR = "ncert_syllabus"
 if not os.path.exists(SYLLABUS_DIR): os.makedirs(SYLLABUS_DIR)
 pdf_files = sorted([f for f in os.listdir(SYLLABUS_DIR) if f.endswith(".pdf")])
 
-# Mode Selection
-st.sidebar.title("🚀 Navigation")
-mode = st.sidebar.radio("Study Mode:", ["Global Search (All Books)", "Chapter Wise"])
+# Navigation
+st.sidebar.title("🚀 Study Navigation")
+mode = st.sidebar.radio("Search Mode:", ["Global (All Chapters)", "Single Chapter"])
 
-selected_chapter = None
-if mode == "Chapter Wise" and pdf_files:
-    selected_chapter = st.sidebar.selectbox("📂 Select Chapter", pdf_files)
+selected_chap = None
+if mode == "Single Chapter" and pdf_files:
+    selected_chap = st.sidebar.selectbox("📂 Choose Chapter", pdf_files)
 
-# Chat History
-if "chat_history" not in st.session_state:
-    st.session_state.chat_history = []
+# Chat State
+if "history" not in st.session_state: st.session_state.history = []
 
 # Display Messages
-for m in st.session_state.chat_history:
+for m in st.session_state.history:
     with st.chat_message(m["role"]):
         st.markdown(m["content"])
         if "image" in m and m["image"]:
-            st.image(m["image"], caption="Relevant Textbook Page")
+            st.image(m["image"], caption="Textbook Context")
 
-# User Interaction
-if prompt := st.chat_input("Search any topic (e.g., Human Eye Diagram, Ohm's Law)..."):
-    st.session_state.chat_history.append({"role": "user", "content": prompt})
+# Input
+if prompt := st.chat_input("Ask a question (e.g., Draw human eye, Explain Ohm's Law)..."):
+    st.session_state.history.append({"role": "user", "content": prompt})
     with st.chat_message("user"): st.markdown(prompt)
 
     with st.chat_message("assistant"):
-        final_text = ""
-        final_img = None
-        source_info = ""
+        found_txt, found_img, p_no, source_file = "", None, 0, ""
+        
+        with st.spinner("Searching NCERT Books..."):
+            targets = [selected_chap] if mode == "Single Chapter" else pdf_files
+            for file in targets:
+                path = os.path.join(SYLLABUS_DIR, file)
+                txt, img, page = find_topic_in_pdf(path, prompt)
+                if txt:
+                    found_txt, found_img, p_no, source_file = txt, img, page, file
+                    break # Stop at first best match
 
-        # SCANNING FILES
-        with st.spinner("🔍 Searching through NCERT Library..."):
-            files_to_scan = [selected_chapter] if mode == "Chapter Wise" else pdf_files
-            
-            for file_name in files_to_scan:
-                path = os.path.join(SYLLABUS_DIR, file_name)
-                text, img, p_no = find_topic_in_pdf(path, prompt)
-                if text:
-                    final_text = text
-                    final_img = img
-                    source_info = f"Source: {file_name} | Page: {p_no}"
-                    break # Found the best match, stop searching
-
-        # AI EXPLANATION
-        if ai_model and final_text:
+        if st.session_state.ai_brain and found_txt:
             try:
-                # Optimized AI prompt with smaller context (5000 chars)
+                # Optimized for Free Tier (Reduced context to 4000 chars)
                 ai_prompt = f"""
-                You are a CBSE Science Teacher. Use this NCERT text: {final_text[:5000]}
-                Answer this student question: {prompt}
-                
-                Guidelines:
-                1. Provide a clear Class 10 level explanation.
-                2. Mention any formulas or laws found in the text.
-                3. Keep the answer exam-focused.
+                You are a CBSE Science Teacher. Use this text: {found_txt[:4000]}
+                Answer this: {prompt}
+                Rules: Use simple Class 10 terms. Mention Board Tips.
                 """
-                response = ai_model.generate_content(ai_prompt)
-                full_response = f"{response.text}\n\n**📍 {source_info}**"
+                response = st.session_state.ai_brain.generate_content(ai_prompt)
+                ans = f"{response.text}\n\n**📍 Source: {source_file} (Page {p_no})**"
                 
-                st.markdown(full_response)
-                if final_img:
-                    st.image(final_img, caption="Diagram from Textbook")
+                st.markdown(ans)
+                if found_img: st.image(found_img, caption=f"Diagram from {source_file}")
                 
-                # Save to history
-                st.session_state.chat_history.append({
-                    "role": "assistant",
-                    "content": full_response,
-                    "image": final_img
-                })
+                st.session_state.history.append({"role": "assistant", "content": ans, "image": found_img})
             except Exception as e:
-                st.error(f"AI Error: {e}")
-                st.info("The topic was found in the book, but the AI is currently hitting a rate limit. Please try again in 30 seconds.")
+                st.error(f"AI could not process the answer: {e}")
         else:
-            st.warning("⚠️ Topic not found in the uploaded PDFs. Try checking your spelling or keywords!")
+            st.warning("Could not find this topic in the books. Please try different keywords!")
 
 st.sidebar.markdown("---")
-st.sidebar.caption("CBSE 2026-27 | Digital Guru")
+st.sidebar.caption("CBSE 2026-27 | Digital Tutor")

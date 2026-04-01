@@ -72,4 +72,84 @@ st.markdown("<h1 class='main-title'>🎓 CBSE Class 10 Science Pro</h1>", unsafe
 
 SYLLABUS_DIR = "ncert_syllabus"
 if not os.path.exists(SYLLABUS_DIR):
-    st.info("Please create a folder 'ncert_syllabus
+    st.info("Please create a folder 'ncert_syllabus' on GitHub and upload PDFs.")
+    st.stop()
+
+pdf_files = sorted([f for f in os.listdir(SYLLABUS_DIR) if f.endswith(".pdf")])
+
+# Session state initialization
+if "kit_data" not in st.session_state: st.session_state.kit_data = None
+if "active_chapter" not in st.session_state: st.session_state.active_chapter = ""
+if "chat_history" not in st.session_state: st.session_state.chat_history = []
+
+if pdf_files:
+    chapter = st.sidebar.selectbox("📂 Choose Chapter", pdf_files)
+    
+    # Handle chapter change
+    if st.session_state.active_chapter != chapter:
+        st.session_state.active_chapter = chapter
+        st.session_state.kit_data = None # Reset kit for new chapter
+        st.session_state.chapter_text = load_text_from_pdf(os.path.join(SYLLABUS_DIR, chapter))
+
+    # GENERATE BUTTON
+    if st.sidebar.button("✨ Generate Visual Study Kit"):
+        if st.session_state.model_engine and st.session_state.chapter_text:
+            with st.spinner("Analyzing Textbook..."):
+                try:
+                    # Shorter context to avoid 400 errors
+                    context = st.session_state.chapter_text[:5000]
+                    prompt = f"Using this text: {context}. Give: CONCEPT:, APP:, EXP:, FOCUS:, 4 FORMULA:, 4 TIP:."
+                    response = st.session_state.model_engine.generate_content(prompt)
+                    st.session_state.kit_data = parse_kit_output(response.text)
+                    st.sidebar.success("Kit Ready! Switch tabs to view.")
+                except Exception as e:
+                    st.sidebar.error(f"AI Error: {e}")
+        else:
+            st.sidebar.warning("AI not ready or PDF empty.")
+
+# --- 6. TABS ---
+tab_chat, tab_visual, tab_cheat = st.tabs(["💬 AI Tutor", "🖼️ Visual Dashboard", "⚡ Exam Flashcards"])
+
+with tab_chat:
+    for m in st.session_state.chat_history:
+        with st.chat_message(m["role"]): st.markdown(m["content"])
+    
+    if p := st.chat_input("Ask a question about this chapter..."):
+        st.session_state.chat_history.append({"role": "user", "content": p})
+        with st.chat_message("user"): st.markdown(p)
+        with st.chat_message("assistant"):
+            if st.session_state.model_engine:
+                try:
+                    ctx = st.session_state.chapter_text[:4000]
+                    res = st.session_state.model_engine.generate_content(f"Context: {ctx}. Q: {p}").text
+                    st.markdown(res)
+                    st.session_state.chat_history.append({"role": "assistant", "content": res})
+                except Exception as e: st.error(f"Chat Error: {e}")
+
+with tab_visual:
+    if st.session_state.kit_data:
+        kit = st.session_state.kit_data
+        b = kit["bento"]
+        st.markdown(f"""
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+            <div class="info-card blue-card"><b>🎯 Core Concept</b><br>{b[0]}</div>
+            <div class="info-card green-card"><b>🌍 Application</b><br>{b[1]}</div>
+            <div class="info-card orange-card"><b>🧪 Key Experiment</b><br>{b[2]}</div>
+            <div class="info-card purple-card"><b>📈 Board Focus</b><br>{b[3]}</div>
+        </div>
+        """, unsafe_allow_html=True)
+    else:
+        st.info("👈 Please click **'Generate Visual Study Kit'** in the sidebar to see visuals.")
+
+with tab_cheat:
+    if st.session_state.kit_data:
+        kit = st.session_state.kit_data
+        c1, c2 = st.columns(2)
+        with c1:
+            st.subheader("🔢 Formula Bank")
+            for f in kit["formulas"]: st.markdown(f"<div class='flashcard'><span class='formula-tag'>{f}</span></div>", unsafe_allow_html=True)
+        with c2:
+            st.subheader("🚩 Board Tips")
+            for t in kit["tips"]: st.markdown(f"<div class='flashcard' style='border-left-color:#E74C3C;'>💡 {t}</div>", unsafe_allow_html=True)
+    else:
+        st.info("👈 Please click **'Generate Visual Study Kit'** in the sidebar to see flashcards.")

@@ -3,14 +3,14 @@ import streamlit as st
 # --- UI CONFIGURATION ---
 st.set_page_config(page_title="Class 10 Science Hub 2026-27", page_icon="🎓", layout="wide")
 
-# --- STYLING ---
+# --- STYLING (FIXED PARAMETER) ---
 st.markdown("""
     <style>
     .main-title { font-size:42px; color: #FF4B4B; font-weight: bold; text-align: center; margin-bottom: 20px; }
     .cheat-box { background-color: #f0f2f6; padding: 20px; border-radius: 12px; border-left: 6px solid #00c0f2; margin-bottom: 15px; }
     .formula-box { background-color: #e8f5e9; padding: 20px; border-radius: 12px; border-left: 6px solid #2e7d32; margin-bottom: 15px; }
     </style>
-    """, unsafe_allow_stdio=True)
+    """, unsafe_allow_html=True)
 
 # --- THE MEGA DATASET (ALL 13 NCERT CHAPTERS) ---
 data = {
@@ -116,7 +116,7 @@ data = {
 }
 
 # --- RENDERING LOGIC ---
-st.markdown('<p class="main-title">🚀 CBSE Class 10 Science Bot (2026-27)</p>', unsafe_allow_stdio=True)
+st.markdown('<p class="main-title">🚀 CBSE Class 10 Science Bot (2026-27)</p>', unsafe_allow_html=True)
 
 # SIDEBAR NAV
 st.sidebar.image("https://cdn-icons-png.flaticon.com/512/583/583325.png", width=80)
@@ -130,8 +130,8 @@ content = data[subject][chapter]
 
 if mode == "⚡ Cheat Sheet & Formulas":
     st.header(f"⚡ Revision: {chapter}")
-    st.markdown(f'<div class="cheat-box"><h3>📝 Cheat Sheet</h3>{content["Cheat Sheet"]}</div>', unsafe_allow_stdio=True)
-    st.markdown(f'<div class="formula-box"><h3>🔢 Formulas/Key Laws</h3>{content["Formulas"]}</div>', unsafe_allow_stdio=True)
+    st.markdown(f'<div class="cheat-box"><h3>📝 Cheat Sheet</h3>{content["Cheat Sheet"]}</div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="formula-box"><h3>🔢 Formulas/Key Laws</h3>{content["Formulas"]}</div>', unsafe_allow_html=True)
 
 elif mode == "📘 Detailed Concepts":
     st.header(f"📘 Full Concept: {chapter}")

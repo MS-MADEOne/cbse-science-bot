@@ -13,58 +13,74 @@ st.set_page_config(page_title="CBSE Science Hub Pro", page_icon="🧪", layout="
 st.markdown("""
     <style>
     .main-title { font-size:42px; color: #1E88E5; font-weight: 800; text-align: center; margin-bottom: 10px; }
-    .status-box { padding: 10px; border-radius: 10px; margin-bottom: 20px; text-align: center; }
     .stChatFloatingInputContainer { bottom: 20px; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- 3. ROBUST AI INITIALIZATION ---
+# --- 3. AUTO-MODEL DISCOVERY ENGINE (FIXES 404) ---
 def init_ai():
     try:
         if "GEMINI_KEY" not in st.secrets:
-            return None, "❌ API Key Missing in Secrets"
+            return None, "❌ API Key Missing"
         
         genai.configure(api_key=st.secrets["GEMINI_KEY"])
         
-        # Try finding the best available model
-        available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+        # ASK GOOGLE WHAT MODELS ARE AVAILABLE FOR YOUR KEY
+        available_models = [m.name for m in genai.list_models() 
+                           if 'generateContent' in m.supported_generation_methods]
         
-        # We prefer gemini-1.5-flash as it is the most stable for PDF context
-        model_name = "models/gemini-1.5-flash" if "models/gemini-1.5-flash" in available_models else "models/gemini-pro"
+        # PREFERENCE LIST (Newest to Oldest)
+        target_models = ["models/gemini-1.5-flash", "models/gemini-1.5-pro", "models/gemini-pro"]
         
-        model = genai.GenerativeModel(model_name)
-        # Test connection
-        model.generate_content("test")
-        return model, "✅ AI Brain Connected"
+        selected_model = None
+        for target in target_models:
+            if target in available_models:
+                selected_model = target
+                break
+        
+        if not selected_model and available_models:
+            selected_model = available_models[0]
+            
+        if selected_model:
+            model = genai.GenerativeModel(selected_model)
+            # Small test to verify
+            model.generate_content("Hi")
+            return model, f"✅ Connected to {selected_model.split('/')[-1]}"
+        else:
+            return None, "❌ No models found in your account"
+            
     except Exception as e:
         return None, f"⚠️ AI Offline: {str(e)[:50]}"
 
-# Initialize AI in session state
+# Persistent AI Initialization
 if "ai_brain" not in st.session_state:
     st.session_state.ai_brain, st.session_state.ai_status = init_ai()
 
 # --- 4. SMART SEARCH ENGINE ---
 def search_books(directory, query):
-    # Filter out common words to focus on science terms
-    stop_words = {"draw", "show", "me", "the", "and", "diagram", "please", "make", "explain"}
+    # Filter common words
+    stop_words = {"draw", "show", "me", "the", "diagram", "please", "make", "explain"}
     keywords = [w for w in query.lower().split() if w not in stop_words and len(w) > 2]
     if not keywords: keywords = query.lower().split()
 
     best_match = {"score": 0, "text": "", "img": None, "page": 0, "file": ""}
     
+    if not os.path.exists(directory): return best_match
     files = [f for f in os.listdir(directory) if f.endswith(".pdf")]
     
     for filename in files:
         doc = fitz.open(os.path.join(directory, filename))
         for page_num, page in enumerate(doc):
             text = page.get_text().lower()
+            # Score based on keyword hits
             score = sum(text.count(kw) for kw in keywords)
             
             if score > best_match["score"]:
+                pix = page.get_pixmap(matrix=fitz.Matrix(2, 2))
                 best_match.update({
                     "score": score, "file": filename, "page": page_num + 1,
-                    "text": page.get_text(), # Only current page text to keep it light
-                    "img": Image.open(io.BytesIO(page.get_pixmap(matrix=fitz.Matrix(2, 2)).tobytes()))
+                    "text": page.get_text(), 
+                    "img": Image.open(io.BytesIO(pix.tobytes()))
                 })
     return best_match
 
@@ -73,11 +89,10 @@ st.markdown("<h1 class='main-title'>🎓 CBSE Class 10 Science Pro</h1>", unsafe
 
 # Sidebar Status
 SYLLABUS_DIR = "ncert_syllabus"
-if not os.path.exists(SYLLABUS_DIR): os.makedirs(SYLLABUS_DIR)
-
 st.sidebar.title("🤖 Assistant Status")
 st.sidebar.markdown(f"**AI Engine:** {st.session_state.ai_status}")
-if st.sidebar.button("♻️ Reconnect AI"):
+
+if st.sidebar.button("♻️ Reset AI Connection"):
     st.session_state.ai_brain, st.session_state.ai_status = init_ai()
     st.rerun()
 
@@ -91,7 +106,7 @@ for m in st.session_state.history:
         if "graph" in m and m["graph"]: st.graphviz_chart(m["graph"])
 
 # --- CHAT INPUT ---
-if prompt := st.chat_input("Search: 'Draw Human Eye' or 'Explain Electricity'..."):
+if prompt := st.chat_input("Search: 'Draw Human Eye' or 'Explain Oxidation'..."):
     st.session_state.history.append({"role": "user", "content": prompt})
     with st.chat_message("user"): st.markdown(prompt)
 
@@ -102,14 +117,13 @@ if prompt := st.chat_input("Search: 'Draw Human Eye' or 'Explain Electricity'...
         if match["score"] > 0:
             if st.session_state.ai_brain:
                 try:
-                    # Very specific prompt to ensure AI generates Graphviz DOT code
+                    # Specialized prompt for drawing instructions and text
                     ai_prompt = f"""
-                    Context: {match['text'][:3000]}
+                    Context from NCERT: {match['text'][:3000]}
                     Question: {prompt}
-                    Role: CBSE Science Teacher
-                    Task: 
-                    1. Short explanation.
-                    2. If 'draw' is asked, provide a logic flowchart using DOT language.
+                    Instruction: 
+                    1. Short CBSE level explanation.
+                    2. If 'draw' is asked, generate a Graphviz DOT flowchart.
                     Format: [Answer] DIAGRAM_START [DOT code] DIAGRAM_END
                     """
                     response = st.session_state.ai_brain.generate_content(ai_prompt)
@@ -125,24 +139,25 @@ if prompt := st.chat_input("Search: 'Draw Human Eye' or 'Explain Electricity'...
                     st.markdown(final_msg)
                     
                     if graph_code:
-                        st.subheader("📊 Logic Flowchart (Bot Drawing)")
+                        st.subheader("📊 Concept Flowchart (Bot Drawing)")
                         st.graphviz_chart(graph_code)
                     
                     st.subheader("🖼️ Textbook Page Reference")
                     st.image(match["img"])
                     
+                    # Save to session history
                     st.session_state.history.append({
                         "role": "assistant", "content": final_msg, 
                         "image": match["img"], "graph": graph_code
                     })
                 except Exception as e:
-                    st.error(f"AI Limit Reached (Error 429). Please wait 30s. Here is the textbook page for now:")
+                    st.error(f"AI Quota Hit (429). Please wait 60s. Showing Textbook Page:")
                     st.image(match["img"])
             else:
-                st.warning(f"AI Brain not connected, but I found this in {match['file']}:")
+                st.warning(f"AI Brain Offline. Showing content from {match['file']}:")
                 st.image(match["img"])
         else:
-            st.error("❌ Topic not found in NCERT files. Try simpler keywords!")
+            st.error("❌ Topic not found in ncert_syllabus folder. Try simple keywords!")
 
 st.sidebar.markdown("---")
 st.sidebar.caption("CBSE 2026-27 | Digital Tutor")

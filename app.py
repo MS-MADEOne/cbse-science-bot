@@ -4,12 +4,11 @@ import google.generativeai as genai
 import re
 import os
 import requests
-import time
 
 # --- 1. UI CONFIG ---
-st.set_page_config(page_title="CBSE Science Hub Pro", page_icon="🧪", layout="wide")
+st.set_page_config(page_title="CBSE Science Pro 2027", page_icon="🧪", layout="wide")
 
-# --- 2. STYLING ---
+# --- 2. STYLING (KEEPING IT BEAUTIFUL) ---
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;800&display=swap');
@@ -25,83 +24,52 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- 3. CORE AI ENGINES ---
-@st.cache_resource
-def init_ai_engine():
+# --- 3. ROBUST AI INITIALIZATION ---
+def get_ai_model():
     try:
-        if "GEMINI_KEY" not in st.secrets: return None
+        if "GEMINI_KEY" not in st.secrets:
+            st.error("🔑 API Key not found! Add 'GEMINI_KEY' in Streamlit Secrets.")
+            return None
         genai.configure(api_key=st.secrets["GEMINI_KEY"])
+        # We use gemini-1.5-flash as it's the most reliable for Free Tier
         return genai.GenerativeModel('gemini-1.5-flash')
-    except: return None
+    except Exception as e:
+        st.error(f"AI Setup Error: {e}")
+        return None
 
-ai_model = init_ai_engine()
+# Load the model into session state so it persists
+if "model_engine" not in st.session_state:
+    st.session_state.model_engine = get_ai_model()
 
+# --- 4. DATA PROCESSING ---
 @st.cache_data
-def get_clean_text(path):
+def load_text_from_pdf(path):
     try:
         with open(path, "rb") as f:
             pdf = pypdf.PdfReader(f)
-            text = " ".join([page.extract_text() for page in pdf.pages])
-            return re.sub(r'[^\x00-\x7F]+', ' ', text).strip()
+            return " ".join([p.extract_text() for p in pdf.pages])
     except: return ""
 
-def get_wiki_img(q):
-    try:
-        url = f"https://en.wikipedia.org/w/api.php?action=query&format=json&formatversion=2&prop=pageimages|pageterms&piprop=original&titles={q}"
-        return requests.get(url).json()['query']['pages'][0]['original']['source']
-    except: return None
-
-# --- 4. ROBUST KEYWORD PARSER ---
-def parse_study_kit(text):
-    sections = {"bento": [], "formulas": [], "tips": []}
+def parse_kit_output(text):
+    """Parses AI output by looking for specific labels"""
+    res = {"bento": [], "formulas": [], "tips": []}
     lines = text.split('\n')
     for line in lines:
-        clean = line.strip().replace('- ', '').replace('* ', '')
-        if 'CONCEPT:' in clean.upper(): sections["bento"].append(clean.split(':', 1)[-1].strip())
-        elif 'APP:' in clean.upper(): sections["bento"].append(clean.split(':', 1)[-1].strip())
-        elif 'EXP:' in clean.upper(): sections["bento"].append(clean.split(':', 1)[-1].strip())
-        elif 'FOCUS:' in clean.upper(): sections["bento"].append(clean.split(':', 1)[-1].strip())
-        elif 'FORMULA:' in clean.upper(): sections["formulas"].append(clean.split(':', 1)[-1].strip())
-        elif 'TIP:' in clean.upper(): sections["tips"].append(clean.split(':', 1)[-1].strip())
-    while len(sections["bento"]) < 4: sections["bento"].append("Refer to NCERT textbook.")
-    return sections
+        clean = line.strip().replace('*', '').replace('-', '')
+        if 'CONCEPT:' in clean.upper(): res["bento"].append(clean.split(':', 1)[-1].strip())
+        elif 'APP:' in clean.upper(): res["bento"].append(clean.split(':', 1)[-1].strip())
+        elif 'EXP:' in clean.upper(): res["bento"].append(clean.split(':', 1)[-1].strip())
+        elif 'FOCUS:' in clean.upper(): res["bento"].append(clean.split(':', 1)[-1].strip())
+        elif 'FORMULA:' in clean.upper(): res["formulas"].append(clean.split(':', 1)[-1].strip())
+        elif 'TIP:' in clean.upper(): res["tips"].append(clean.split(':', 1)[-1].strip())
+    
+    # Fill defaults if AI skipped something
+    while len(res["bento"]) < 4: res["bento"].append("Refer to NCERT textbook.")
+    return res
 
-# --- 5. MAIN APP INTERFACE ---
+# --- 5. MAIN APP ---
 st.markdown("<h1 class='main-title'>🎓 CBSE Class 10 Science Pro</h1>", unsafe_allow_html=True)
 
 SYLLABUS_DIR = "ncert_syllabus"
-if not os.path.exists(SYLLABUS_DIR): os.makedirs(SYLLABUS_DIR)
-pdf_files = sorted([f for f in os.listdir(SYLLABUS_DIR) if f.endswith(".pdf")])
-
-# Initialize session state
-if "msgs" not in st.session_state: st.session_state.msgs = []
-
-if pdf_files:
-    chapter = st.sidebar.selectbox("📂 Select Chapter", pdf_files)
-    raw_text = get_clean_text(os.path.join(SYLLABUS_DIR, chapter))
-
-    # CACHED AI CALL FOR STUDY KIT
-    @st.cache_data(show_spinner=False)
-    def get_ai_kit(chap_name, text_content):
-        prompt = f"Analyze: {text_content[:6000]}. Provide labels: CONCEPT:, APP:, EXP:, FOCUS:, FORMULA: (list 4), TIP: (list 4)."
-        try:
-            response = ai_model.generate_content(prompt)
-            return parse_study_kit(response.text)
-        except Exception as e:
-            if "429" in str(e): return "QUOTA_ERROR"
-            return None
-
-    # Logic to handle the "Generate" Button
-    if st.sidebar.button("✨ Generate Visual Study Kit"):
-        kit_result = get_ai_kit(chapter, raw_text)
-        if kit_result == "QUOTA_ERROR":
-            st.sidebar.error("🚨 AI is resting! Please wait 60 seconds and try again.")
-        elif kit_result:
-            st.session_state.kit_data = kit_result
-            st.sidebar.success("✅ Study Kit Ready!")
-        else:
-            st.sidebar.error("Something went wrong. Check API Key.")
-
-else:
-    st.sidebar.warning("Upload PDFs to 'ncert_syllabus' folder on GitHub!")
-    st.sto
+if not os.path.exists(SYLLABUS_DIR):
+    st.info("Please create a folder 'ncert_syllabus

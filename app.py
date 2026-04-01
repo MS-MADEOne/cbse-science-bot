@@ -151,7 +151,7 @@ else:
 st.sidebar.divider()
 st.sidebar.write("✅ **Syllabus:** CBSE 2024-25")
 st.sidebar.write("👨‍🏫 **Target:** Class 10 Board Exams"),
-    "Chemistry": {
+    } }"Chemistry": {
         "Chemical Reactions": {
             "Concepts": "Combination, Decomposition, Displacement, Redox reactions.",
             "MCQs": ["1. Burning of Magnesium is? \nAns: Oxidation"],

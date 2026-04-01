@@ -1,97 +1,81 @@
 import streamlit as st
-import PyPDF2
-import io
+import pypdf
+import google.generativeai as genai
 
 # --- UI CONFIG ---
-st.set_page_config(page_title="CBSE Class 10 Science - Full Access", page_icon="📖", layout="wide")
+st.set_page_config(page_title="CBSE Science AI Tutor", page_icon="🧬", layout="wide")
 
 # --- STYLING ---
 st.markdown("""
     <style>
-    .main-title { font-size:40px; color: #2E4053; font-weight: bold; text-align: center; }
-    .stAlert { border-radius: 10px; }
+    .main-title { font-size:40px; color: #1E88E5; font-weight: bold; text-align: center; }
+    .stChatFloatingInputContainer { bottom: 20px; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- FUNCTION TO READ PDF ---
-import pypdf  # Change this from PyPDF2 to pypdf
+# --- GOOGLE AI SETUP ---
+# For security, you can put your key here, OR use Streamlit Secrets
+API_KEY = "PASTE_YOUR_GEMINI_API_KEY_HERE" 
+genai.configure(api_key=API_KEY)
+model = genai.GenerativeModel('gemini-pro')
 
-# --- FUNCTION TO READ PDF (UPDATED) ---
 def read_pdf(file):
-    try:
-        pdf_reader = pypdf.PdfReader(file)
-        text = ""
-        for page in pdf_reader.pages:
-            content = page.extract_text()
-            if content:
-                text += content
-        return text
-    except Exception as e:
-        st.error(f"Error reading PDF: {e}")
-        return ""
+    pdf_reader = pypdf.PdfReader(file)
+    text = ""
+    for page in pdf_reader.pages:
+        text += page.extract_text()
+    return text
 
-# --- MAIN APP ---
-st.markdown('<p class="main-title">🧪 CBSE Class 10 Science: Full Syllabus Bot</p>', unsafe_allow_html=True)
+# --- APP INTERFACE ---
+st.markdown('<p class="main-title">🤖 CBSE Class 10 Smart AI Tutor</p>', unsafe_allow_html=True)
 
-# SIDEBAR: SOURCE SELECTION
-st.sidebar.title("🛠️ Knowledge Source")
-source = st.sidebar.radio("Choose Source:", ["NCERT Digital Hub", "Upload PDF Book", "Cheat Sheets"])
+st.sidebar.title("📚 Study Material")
+uploaded_file = st.sidebar.file_uploader("Upload NCERT Science PDF", type="pdf")
 
-if source == "Upload PDF Book":
-    st.header("📂 Upload NCERT Science PDF")
-    st.info("You can download the official NCERT PDF from ncert.nic.in and upload it here.")
-    uploaded_file = st.file_uploader("Choose the Science Book PDF", type="pdf")
-    
-    if uploaded_file is not None:
-        with st.spinner("Bot is reading the book..."):
-            book_text = read_pdf(uploaded_file)
-            st.success("Book Loaded Successfully!")
+if uploaded_file:
+    with st.spinner("Analyzing the syllabus..."):
+        syllabus_text = read_pdf(uploaded_file)
+        st.sidebar.success("Syllabus Loaded!")
+
+    # Chat Interface
+    if "messages" not in st.session_state:
+        st.session_state.messages = []
+
+    # Display chat history
+    for message in st.session_state.messages:
+        with st.chat_message(message["role"]):
+            st.markdown(message["content"])
+
+    # User Input
+    if prompt := st.chat_input("Ask me anything (e.g. Explain Ohm's Law with an example)"):
+        st.session_state.messages.append({"role": "user", "content": prompt})
+        with st.chat_message("user"):
+            st.markdown(prompt)
+
+        with st.chat_message("assistant"):
+            # The "Prompt Engineering" - Telling the AI how to behave
+            context_prompt = f"""
+            You are a Class 10 CBSE Science Teacher. 
+            Use the following text from the NCERT textbook to answer the student's question accurately.
+            If the answer is not in the text, use your general science knowledge but stay within the CBSE Class 10 syllabus.
+            Provide: 
+            1. A simple explanation.
+            2. The formula (if any).
+            3. A common exam question on this topic.
             
-            # Search Feature within PDF
-            query = st.text_input("🔍 Ask anything from the uploaded book (e.g., 'What is Tyndall Effect?')")
-            if query:
-                # Basic search logic to find relevant sentences
-                results = [line for line in book_text.split('.') if query.lower() in line.lower()]
-                if results:
-                    st.write("### 🤖 Bot's Answer (Found in PDF):")
-                    for r in results[:3]: # Show top 3 results
-                        st.write(f"- {r.strip()}.")
-                else:
-                    st.warning("Sorry, I couldn't find that specific topic in the PDF. Try different keywords.")
+            Textbook Context: {syllabus_text[:5000]} # Using first 5000 chars for speed
+            
+            Student Question: {prompt}
+            """
+            
+            response = model.generate_content(context_prompt)
+            st.markdown(response.text)
+            st.session_state.messages.append({"role": "assistant", "content": response.text})
 
-elif source == "NCERT Digital Hub":
-    st.header("🌍 Official NCERT Resources")
-    st.write("Since the full syllabus is vast, use these direct links for the 2026-27 pattern:")
-    
-    col1, col2 = st.columns(2)
-    with col1:
-        st.link_button("📘 Download Full Science Book (PDF)", "https://ncert.nic.in/textbook.php?jesc1=0-13")
-        st.link_button("🧪 Chemistry Chapters", "https://ncert.nic.in/textbook.php?jesc1=1-4")
-    with col2:
-        st.link_button("🧬 Biology Chapters", "https://ncert.nic.in/textbook.php?jesc1=5-8")
-        st.link_button("⚡ Physics Chapters", "https://ncert.nic.in/textbook.php?jesc1=9-12")
+else:
+    st.info("👋 Welcome! Please upload your Science NCERT PDF in the sidebar to start learning with the AI Tutor.")
+    st.image("https://ncert.nic.in/textbook/pdf/jesc110.pdf", caption="Try uploading a chapter from NCERT", width=300)
 
-    st.divider()
-    st.subheader("💡 Study Tip")
-    st.write("The 2026-27 Board exams focus heavily on **Competency Based Questions**. Don't just memorize definitions; understand the 'Why' behind every experiment!")
-
-elif source == "Cheat Sheets":
-    st.header("⚡ Chapter-wise Formula & Concept Cheat Sheets")
-    chapter = st.selectbox("Select Chapter", ["Chemical Reactions", "Acids, Bases & Salts", "Metals & Non-metals", "Life Processes", "Light", "Electricity"])
-    
-    # Example for one chapter - you can expand this
-    if chapter == "Electricity":
-        st.code("""
-        - V = IR (Ohm's Law)
-        - P = VI = I²R = V²/R
-        - R = ρL/A
-        - Series: Rs = R1 + R2 + R3
-        - Parallel: 1/Rp = 1/R1 + 1/R2 + 1/R3
-        - 1 kWh = 3.6 × 10⁶ Joules
-        """, language="markdown")
-        st.image("https://upload.wikimedia.org/wikipedia/commons/thumb/5/5f/Ohm%27s_law_setup.svg/300px-Ohm%27s_law_setup.svg.png")
-
-# FOOTER
+# SIDEBAR INFO
 st.sidebar.markdown("---")
-st.sidebar.write("✅ **Bot Status:** Online")
-st.sidebar.write("🎓 **Class:** 10th CBSE")
+st.sidebar.info("💡 **Tip:** Ask the bot to generate MCQs or explain diagrams from the text!")
